@@ -1,0 +1,128 @@
+module IndexedDb.Transaction exposing (..)
+
+{-|-}
+
+import Gren.Kernel.IndexedDb
+import Task exposing (Task)
+
+
+{-|-}
+type Transaction type_
+    = Transaction Ref (Array Action)
+
+
+{-| Reference to the transaction for use in kernel code.
+-}
+type Ref
+    = Ref
+
+
+{-|-}
+type Error
+    = Aborted
+    | Unknown String
+
+
+{-|-}
+type Mode
+    = ReadOnly
+    | ReadWrite
+
+
+{-|-}
+type Action
+    = Abort
+    | CreateIndex String (Array String)
+    | CreateStore String (Maybe (Array String)) Bool
+
+
+{-|-}
+type Upgrade
+    = Upgrade
+
+
+{-| A normal transaction, not triggered during the upgrade.
+-}
+type Normal
+    = Normal
+
+
+{-|-}
+createIndex : String -> Array String -> Transaction Upgrade -> Transaction Upgrade
+createIndex name keyPath (Transaction ref actions)=
+    Transaction ref (Array.pushLast (CreateIndex name keyPath) actions)
+
+
+{-|-}
+deleteIndex : Transaction Upgrade -> Transaction Upgrade
+deleteIndex =
+    Debug.todo ""
+
+
+{-|-}
+createStore : String -> Maybe (Array String) -> Bool -> Transaction Upgrade -> Transaction Upgrade
+createStore name keyPath autoIncrement (Transaction ref actions) =
+    Transaction ref (Array.pushLast (CreateStore name keyPath autoIncrement) actions)
+
+
+{-| Delete the provided store, if it exists. Can only be done when the database is 
+being upgraded.
+-}
+deleteStore : String -> Transaction Upgrade -> Transaction Upgrade
+deleteStore =
+    Debug.todo ""
+
+
+{-| Get the database that the passed transaction is targeting.
+-}
+database : Transaction a -> String
+database (Transaction ref _actions) =
+    Debug.todo ""
+
+
+{-| Params:
+scope = object stores that can be changed or edited in this transaction
+mode = the allowed accesses to the stores in the database
+-}
+new : Array String -> Mode -> String -> Transaction Normal
+new scope mode passedDb =
+    Gren.Kernel.IndexedDb.newTransaction passedDb
+
+
+{-| Abort the given transaction. Prevents, at the type level, doing anything else 
+to this transaction. Nothing will happen.
+
+Useful if you'd like to do some checks on the state of the database and abandon a 
+transaction if something is off!
+
+This will never fail, given nothing is actually done.
+-}
+abort : Transaction Normal -> Task String b
+abort (Transaction ref actions) =
+    let
+        future =
+            Transaction ref (Array.pushLast Abort actions)
+    in
+    Task.fail ""
+
+
+{-| An internal function that takes some `Action` and makes the proper call to
+the kernel code. The returned `Task String {}` doesn't really matter, given the
+returned functions are executed in the kernel.
+
+Should only be called from kernel code. Shouldn't be used anywhere else.
+-}
+actionToTask : Action -> Transaction a -> Task String {}
+actionToTask action transaction =
+    case action of
+        Abort ->
+            Gren.Kernel.IndexedDb.abortTransaction
+        
+        CreateIndex name keyPath ->
+            Gren.Kernel.IndexedDb.createIndex name keyPath transaction
+
+        CreateStore name (Just keyPath) autoIncrement ->
+            Gren.Kernel.IndexedDb.createObjectStore name keyPath autoIncrement transaction
+
+        CreateStore name Nothing autoIncrement ->
+            Gren.Kernel.IndexedDb.createObjectStore name "" autoIncrement transaction

@@ -1,0 +1,35 @@
+module IndexedDb exposing (Database, open)
+
+{-|
+
+@docs Database
+
+@docs open
+
+-}
+
+import Gren.Kernel.IndexedDb
+import IndexedDb.Transaction as Transaction exposing (Transaction, Upgrade)
+import Task exposing (Task)
+
+
+{-| An indexedDb database.
+-}
+type Database
+    = Database Ref
+
+
+{-|-}
+type Ref
+    = Ref
+
+
+{-| Open the given database at the given version.
+
+If the database version in the browser is less than the version given to this
+function, it will run the given function. Some actions are only available in
+this upgrade function. For more details ...
+-}
+open : String -> Int -> (Int -> Int -> Transaction Upgrade -> Transaction Upgrade) -> Task Transaction.Error Database
+open =
+    Gren.Kernel.IndexedDb.open
